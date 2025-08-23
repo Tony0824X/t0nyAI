@@ -174,7 +174,7 @@ let currentPage = 'home';
           </div>
         </div>
         <form id="ta-form" class="ta-input">
-          <input id="ta-text" type="text" placeholder="輸入訊息…（Enter 送出，Shift+Enter 換行）" autocomplete="off" required />
+          <input id="ta-text" type="text" placeholder="輸入訊息…" autocomplete="off" required />
           <button type="submit" class="cta-button">送出</button>
         </form>
       </div>
