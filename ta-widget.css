@@ -1,26 +1,108 @@
-/* ta-widget.css — 外部樣式（避免 CSP 的 inline 限制） */
-#ta-root{position:fixed;right:20px;bottom:20px;z-index:9999}
-#ta-open{width:56px;height:56px;border:none;border-radius:50%;cursor:pointer;
-  line-height:56px;font-size:24px;text-align:center;background:rgba(255,255,255,.25);
-  backdrop-filter:blur(12px);box-shadow:0 10px 30px rgba(0,0,0,.25)}
-#ta-window{position:absolute;right:0;bottom:70px;width:min(380px,90vw);height:520px;
-  display:none;border-radius:18px;overflow:hidden;background:rgba(255,255,255,.18);
-  backdrop-filter:blur(20px);box-shadow:0 18px 50px rgba(0,0,0,.28);
-  display:flex;flex-direction:column}
-.ta-header{display:flex;align-items:center;justify-content:space-between;
-  padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.25);flex:0 0 auto}
-.ta-title{display:flex;gap:10px;align-items:center;font-weight:700}
-.ta-title img{width:28px;height:28px;object-fit:contain}
-#ta-close{border:none;background:transparent;font-size:18px;cursor:pointer}
-.ta-body{position:relative;flex:1 1 auto;min-height:0}
-.ta-log{position:absolute;inset:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;
-  scrollbar-gutter:stable both-edges;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-.ta-msg{max-width:85%;width:fit-content;padding:10px 12px;border-radius:14px;
-  word-break:break-word;white-space:pre-wrap}
-.ta-me{align-self:flex-end;background:rgba(46,204,113,.18);border:1px solid rgba(46,204,113,.35)}
-.ta-bot{align-self:flex-start;background:rgba(255,255,255,.28);border:1px solid rgba(255,255,255,.4)}
-.ta-input{display:flex;gap:8px;padding:12px 12px 16px;border-top:1px solid rgba(255,255,255,.25);
-  background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.18));flex:0 0 auto}
-#ta-text{flex:1;border:1px solid rgba(255,255,255,.45);border-radius:12px;padding:10px 12px;
-  background:rgba(255,255,255,.4);outline:none;margin-bottom:2px}
-#ta-text::placeholder{color:rgba(0,0,0,.5)}
+/* ta-widget.css — T0nyAI Chat (glass + stable layout) */
+
+/* 基礎：避免邊框/內距造成跳動 */
+#ta-root, #ta-root * { box-sizing: border-box; }
+
+/* 漂浮啟動鈕 */
+#ta-root{ position:fixed; right:20px; bottom:20px; z-index:9999; }
+#ta-open{
+  width:56px; height:56px; border:none; border-radius:50%; cursor:pointer;
+  line-height:56px; font-size:24px; text-align:center;
+  background:rgba(255,255,255,.25); color:#111;
+  backdrop-filter: blur(12px);
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+#ta-open:hover{ transform:translateY(-2px); box-shadow:0 14px 36px rgba(0,0,0,.28); }
+
+/* 主視窗：固定在右下、三段式（header / body / footer）且版面隔離 */
+#ta-window{
+  position:absolute; right:0; bottom:70px; width:min(380px,90vw); height:520px;
+  display:none;                           /* 由 JS 切到 flex 顯示 */
+  border-radius:18px; overflow:hidden;
+  background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.12));
+  backdrop-filter: blur(20px);
+  box-shadow:0 18px 50px rgba(0,0,0,.28);
+  display:flex; flex-direction:column;    /* 兼容你現有的 JS */
+  contain: layout paint style;            /* 降低外部 reflow 影響 */
+  resize: vertical;                       /* 允許拖拉高度 */
+  min-height:360px; max-height:92vh;
+}
+
+/* Header 固定 */
+.ta-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.25);
+  flex:0 0 auto;
+}
+.ta-title{ display:flex; gap:10px; align-items:center; font-weight:700; }
+.ta-title img{ width:28px; height:28px; object-fit:contain; }
+#ta-close{ border:none; background:transparent; font-size:18px; cursor:pointer; color:#222; }
+
+/* 中段容器固定高度，由內部 .ta-log 自己捲動（不推擠 footer） */
+.ta-body{ position:relative; flex:1 1 auto; min-height:0; overflow:hidden; }
+
+/* 訊息區：填滿 .ta-body，自帶捲軸且預留捲軸溝槽避免跳動 */
+.ta-log{
+  position:absolute; inset:0; padding:14px;
+  display:flex; flex-direction:column; gap:10px;
+  overflow-y:auto;
+  scrollbar-gutter: stable both-edges;    /* 預留捲軸空間，避免寬度跳動 */
+  overscroll-behavior: contain;           /* 不把捲動傳到整頁 */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 自訂捲軸（可按需調整） */
+.ta-log::-webkit-scrollbar{ width:10px; }
+.ta-log::-webkit-scrollbar-track{ background:transparent; }
+.ta-log::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.35);
+  border-radius:8px;
+}
+
+/* 泡泡訊息：彈性寬度 + 長字斷行 */
+.ta-msg{
+  max-width:85%; width:fit-content;
+  padding:10px 12px; border-radius:14px;
+  word-break:break-word; white-space:pre-wrap;
+  border:1px solid rgba(255,255,255,.35);
+  background: rgba(255,255,255,.28);
+}
+.ta-me{
+  align-self:flex-end;
+  background:rgba(46,204,113,.18);
+  border-color:rgba(46,204,113,.35);
+}
+.ta-bot{
+  align-self:flex-start;
+  background:rgba(255,255,255,.28);
+  border-color:rgba(255,255,255,.4);
+}
+
+/* Footer（輸入列）固定在最底，不被擠壓 */
+.ta-input{
+  display:flex; gap:8px; padding:12px 12px 16px;
+  border-top:1px solid rgba(255,255,255,.25);
+  background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.18));
+  flex:0 0 auto;
+}
+
+/* 文字輸入框：含 2px 下間距 */
+#ta-text{
+  flex:1;
+  border:1px solid rgba(255,255,255,.45);
+  border-radius:12px;
+  padding:10px 12px;
+  background:rgba(255,255,255,.4);
+  outline:none;
+  margin-bottom:2px;                      /* 你要求的 2px 空隙 */
+}
+#ta-text::placeholder{ color:rgba(0,0,0,.5); }
+
+/* 只影響 widget 內的送出鈕，不動到站上其他 .cta-button */
+#ta-window .cta-button{
+  border:none; border-radius:14px; padding:10px 18px; cursor:pointer;
+  background:rgba(255,255,255,.25); color:#fff; font-weight:700;
+  outline:1px solid rgba(255,255,255,.6);
+  backdrop-filter: blur(8px);
+}
