@@ -143,106 +143,126 @@ let currentPage = 'home';
         `;
         document.head.appendChild(fadeStyle);
 
-/* ==== DeepSeek Chatbox: client-only (no proxy, Shadow DOM) ==== */
+/* ==== Poe Chatbox: client-only (OpenAI-compatible, key round-robin) ==== */
 (() => {
-    // ⚠️ 仍是前端硬編 API Key（正式站建議改走後端）
-    const KEY = "sk-ad3d36b49f9a4b56a3e630abafe8f94f";
-    if (!KEY) return;
-  
-    // 載入外部 CSS（符合常見 CSP：style-src 'self'）
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'ta-widget.css';  // 確認放置路徑
-    document.head.appendChild(link);
-  
-    // DOM
-    const root = document.createElement('div');
-    root.id = 'ta-root';
-    root.innerHTML = `
-      <button id="ta-open" aria-label="Open assistant">💬</button>
-      <div id="ta-window" role="dialog" aria-label="Assistant">
-        <div class="ta-header">
-          <div class="ta-title">
-            <img src="images/T0nyAI_logo.png" alt="T0nyAI"/>
-            <span>T0nyAI Assistant</span>
-          </div>
-          <button id="ta-close" aria-label="Close">✕</button>
+  // ⚠️ 依需求：前端直放 API Keys（每則訊息輪替一把）
+  const POE_KEYS = [
+    "9hLM5-II9L1VFhLGjiKwhQCTUaqCWL1uE4a3m3CLp9M",
+    "OcIKAOi4JZvbGqhdP3fXaa2sogZC0gGVqX2UnNBm3nA",
+    "JhBjdcTazfgP_je1vh1iPNqLgSGLUT1YLJW58Ns7Tck",
+    "kz0OAgf-I-QPpK7f3ES4sZEjCpf6eYrX_0rb3eUwlb8",
+    "DqaCjSGNArfWK2JoElgTNzJLZp0iVa5_wBbljrrpH1Q",
+  ];
+  let keyIndex = 0;
+  const nextKey = () => {
+    const k = POE_KEYS[keyIndex % POE_KEYS.length];
+    keyIndex++;
+    return k;
+  };
+
+  // 載入 widget CSS（沿用原本）
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'ta-widget.css';
+  document.head.appendChild(link);
+
+  // DOM
+  const root = document.createElement('div');
+  root.id = 'ta-root';
+  root.innerHTML = `
+    <button id="ta-open" aria-label="Open assistant">💬</button>
+    <div id="ta-window" role="dialog" aria-label="Assistant">
+      <div class="ta-header">
+        <div class="ta-title">
+          <img src="images/T0nyAI_logo.png" alt="T0nyAI"/>
+          <span>T0nyAI Assistant</span>
         </div>
-        <div class="ta-body">
-          <div id="ta-log" class="ta-log" role="log" aria-live="polite">
-            <div class="ta-msg ta-bot">嗨，我係 T0nyAI 小助手 🙂🙂！</div>
-          </div>
-        </div>
-        <form id="ta-form" class="ta-input">
-          <input id="ta-text" type="text" placeholder="輸入訊息…" autocomplete="off" required />
-          <button type="submit" class="cta-button">送出</button>
-        </form>
+        <button id="ta-close" aria-label="Close">✕</button>
       </div>
-    `;
-    document.body.appendChild(root);
-  
-    const openBtn  = document.getElementById('ta-open');
-    const winEl    = document.getElementById('ta-window');
-    const closeBtn = document.getElementById('ta-close');
-    const form     = document.getElementById('ta-form');
-    const input    = document.getElementById('ta-text');
-    const log      = document.getElementById('ta-log');
-  
-    const open = () => { winEl.style.display = 'flex'; input.focus(); toBottom(); };
-    const close = () => { winEl.style.display = 'none'; };
-    openBtn.addEventListener('click', () => (winEl.style.display === 'flex' ? close() : open()));
-    closeBtn.addEventListener('click', close);
-  
-    function toBottom(){ requestAnimationFrame(()=>{ log.scrollTop = log.scrollHeight; }); }
-    function addMsg(text, who='bot'){
-      const d = document.createElement('div');
-      d.className = `ta-msg ${who === 'me' ? 'ta-me' : 'ta-bot'}`;
-      d.textContent = text;
-      log.appendChild(d);
-      toBottom();
-      return d;
-    }
-  
-    async function askDeepSeek(userText, history=[]){
-      const payload = {
-        model: 'deepseek-chat',
-        messages: [
-          { role:'system', content:'Your Name is T0nyAI. You are a helpful AI assistant of T0nyAI website. 一律使用繁體中文與簡潔回應。' },
-          ...history.slice(-12),
-          { role:'user', content:userText }
-        ],
-        temperature: 0.7, stream: false
-      };
-      const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method:'POST',
-        headers:{ 'Authorization':`Bearer ${KEY}`, 'Content-Type':'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!r.ok) throw new Error(`${r.status} ${await r.text().catch(()=> '')}`);
-      const data = await r.json();
-      return data?.choices?.[0]?.message?.content ?? '(無回覆內容)';
-    }
-  
-    const history = [];
-    form.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const t = input.value.trim();
-      if (!t) return;
-      addMsg(t, 'me'); history.push({ role:'user', content:t }); input.value=''; input.focus();
-  
-      const thinking = addMsg('思考中…');
-      try{
-        const reply = await askDeepSeek(t, history);
-        thinking.remove(); addMsg(reply, 'bot'); history.push({ role:'assistant', content:reply });
-      }catch(err){
-        thinking.remove();
-        const msg = (String(err).toLowerCase().includes('cors') || String(err).includes('csp'))
-          ? '瀏覽器攔截了連線（CORS/CSP）。'
-          : `抱歉，服務暫時無法連線：${err.message||err}`;
-        addMsg(msg,'bot');
-        console.error('[TA]', err);
-      }
+      <div class="ta-body">
+        <div id="ta-log" class="ta-log" role="log" aria-live="polite">
+          <div class="ta-msg ta-bot">Tony AI Bot here. Ask me anything about Tony’s achievements. 🙂🙂！</div>
+        </div>
+      </div>
+      <form id="ta-form" class="ta-input">
+        <input id="ta-text" type="text" placeholder="輸入訊息…" autocomplete="off" required />
+        <button type="submit" class="cta-button">送出</button>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(root);
+
+  const openBtn  = document.getElementById('ta-open');
+  const winEl    = document.getElementById('ta-window');
+  const closeBtn = document.getElementById('ta-close');
+  const form     = document.getElementById('ta-form');
+  const input    = document.getElementById('ta-text');
+  const log      = document.getElementById('ta-log');
+
+  const open = () => { winEl.style.display = 'flex'; input.focus(); toBottom(); };
+  const close = () => { winEl.style.display = 'none'; };
+  openBtn.addEventListener('click', () => (winEl.style.display === 'flex' ? close() : open()));
+  closeBtn.addEventListener('click', close);
+
+  function toBottom(){ requestAnimationFrame(()=>{ log.scrollTop = log.scrollHeight; }); }
+  function addMsg(text, who='bot'){
+    const d = document.createElement('div');
+    d.className = `ta-msg ${who === 'me' ? 'ta-me' : 'ta-bot'}`;
+    d.textContent = text;
+    log.appendChild(d);
+    toBottom();
+    return d;
+  }
+
+  // 以 Poe 的 OpenAI 相容端點請求
+  async function askPoe(userText, history=[]){
+    const body = {
+      model: "TonyBuddy_0001", // 你已訓練好的 Poe Bot
+      messages: [
+        // 可依需求加入 system 指令；這裡直接讓 Bot 依 Poe 設定運作
+        ...history.slice(-12),               // 保留最近對話
+        { role: "user", content: userText }
+      ]
+    };
+
+    const r = await fetch("https://api.poe.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${nextKey()}`, // 每題換一把 key
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
     });
-  })();
-  
+
+    if (!r.ok) {
+      throw new Error(`${r.status} ${await r.text().catch(()=> '')}`);
+    }
+    const data = await r.json();
+    // OpenAI 相容格式：choices[0].message.content
+    return data?.choices?.[0]?.message?.content ?? "(無回覆內容)";
+  }
+
+  const history = [];
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const t = input.value.trim();
+    if (!t) return;
+    addMsg(t, 'me'); history.push({ role:'user', content:t }); input.value=''; input.focus();
+
+    const thinking = addMsg('Thinking...');
+    try{
+      const reply = await askPoe(t, history);
+      thinking.remove(); addMsg(reply, 'bot'); history.push({ role:'assistant', content:reply });
+    }catch(err){
+      thinking.remove();
+      // 仍保留原本錯誤提示樣式
+      const msg = (String(err).toLowerCase().includes('cors') || String(err).includes('csp'))
+        ? '瀏覽器攔截了連線（CORS/CSP）。'
+        : `抱歉，服務暫時無法連線：${err.message||err}`;
+      addMsg(msg,'bot');
+      console.error('[TA][Poe]', err);
+    }
+  });
+})();
+
   
